@@ -17,8 +17,8 @@ function normalize(s: string): string {
     一:"1",二:"2",三:"3",四:"4",五:"5",六:"6",七:"7",八:"8",九:"9",十:"10",
   };
   s = s.replace(/[一二三四五六七八九十](?=丁目|番|号)/g, (c) => km[c] ?? c);
-  s = s.replace(/（株）|㈱|\(株\)/g, "KK__");
-  s = s.replace(/（有）|㈲|\(有\)/g, "YK__");
+  s = s.replace(/（株）|㈱|\(株\)/g, "株式会社");
+  s = s.replace(/（有）|㈲|\(有\)/g, "有限会社");
   s = s.replace(/株式会社/g, "KK__");
   s = s.replace(/有限会社/g, "YK__");
   s = s.replace(/合同会社/g, "GK__");
@@ -27,6 +27,15 @@ function normalize(s: string): string {
   s = s.replace(/\s+/g, "");
   s = s.replace(/　/g, "");
   return s;
+}
+
+// ─── 表示用ノーマライザー（内部キーを日本語に戻す） ──────────
+function normalizeForDisplay(s: string): string {
+  let result = normalize(s);
+  result = result.replace(/KK__/g, "株式会社");
+  result = result.replace(/YK__/g, "有限会社");
+  result = result.replace(/GK__/g, "合同会社");
+  return result;
 }
 
 function findDiffs(a: string, b: string): number[] {
@@ -70,7 +79,9 @@ function exportCSV(rows: RowResult[]) {
 
 type RowResult = {
   n: number; l: string; r: string;
-  nl: string; nr: string; ok: boolean; diffs: number[];
+  nl: string; nr: string;
+  nld: string; nrd: string; // 表示用（内部キーなし）
+  ok: boolean; diffs: number[];
 };
 
 const DEMO_LEFT = `東京都千代田区一番町１丁目５
@@ -96,7 +107,7 @@ const DEMO_RIGHT = `東京都千代田区一番町1丁目5
 const RULES = [
   { label: "数字の表記ゆれ",     desc: "全角「１２３」と半角「123」を同じとみなします" },
   { label: "法人格の表記ゆれ",    desc: "「株式会社」「（株）」「㈱」などを同一視します" },
-  { label: "住所の表記ゆれ",      desc: "「ヶ」「ケ」「一丁目」「1丁目」などを同一視します" },
+  { label: "住所の表記ゆれ",      desc: "「ヶ」「ケ」、「一丁目」「1丁目」などを同一視します" },
   { label: "記号・スペースの差異", desc: "全角・半角カンマ、ハイフン、余分なスペースを無視します" },
 ];
 
@@ -132,7 +143,8 @@ export default function MokushiKiller() {
       const right = rLines[i] ?? "";
       if (left.trim() === "" && right.trim() === "") continue;
       const nl = normalize(left), nr = normalize(right), ok = nl === nr;
-      rows.push({ n: i + 1, l: left, r: right, nl, nr, ok, diffs: ok ? [] : findDiffs(nl, nr) });
+      const nld = normalizeForDisplay(left), nrd = normalizeForDisplay(right);
+      rows.push({ n: i + 1, l: left, r: right, nl, nr, nld, nrd, ok, diffs: ok ? [] : findDiffs(nl, nr) });
     }
     setResults(rows);
     setStats({ ok: rows.filter((r) => r.ok).length, ng: rows.filter((r) => !r.ok).length });
@@ -158,12 +170,13 @@ export default function MokushiKiller() {
             <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">2つのテキストを比較して差分を検出</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 bg-slate-100 rounded-md px-2.5 py-1 hidden sm:inline">
+            {/* ヘッダーバッジ：文字色を濃く */}
+            <span className="text-xs text-slate-600 bg-slate-100 rounded-md px-2.5 py-1 hidden sm:inline font-medium">
               ブラウザ完結 · データ送信なし
             </span>
             <button
               onClick={() => setShowGuide((v) => !v)}
-              className="text-xs text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors whitespace-nowrap"
+              className="text-xs text-slate-600 border border-slate-300 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors whitespace-nowrap font-medium"
             >
               {showGuide ? "閉じる" : "使い方"}
             </button>
@@ -208,10 +221,7 @@ export default function MokushiKiller() {
 
         {/* ── 入力カード ── */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-5 space-y-4 sm:space-y-5">
-
-          {/* ステップ1・2 — スマホ: 縦並び / PC: 横並び */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* 比較元 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <StepCircle num={1} />
@@ -228,11 +238,10 @@ export default function MokushiKiller() {
                 spellCheck={false}
               />
               {leftText && (
-                <p className="text-[11px] text-slate-400">{leftText.split("\n").length} 行 入力中</p>
+                <p className="text-[11px] text-slate-500">{leftText.split("\n").length} 行 入力中</p>
               )}
             </div>
 
-            {/* 比較先 */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <StepCircle num={2} />
@@ -249,12 +258,11 @@ export default function MokushiKiller() {
                 spellCheck={false}
               />
               {rightText && (
-                <p className="text-[11px] text-slate-400">{rightText.split("\n").length} 行 入力中</p>
+                <p className="text-[11px] text-slate-500">{rightText.split("\n").length} 行 入力中</p>
               )}
             </div>
           </div>
 
-          {/* エラー・警告 */}
           {error && (
             <div className="flex items-center gap-2 text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-4 py-2.5">
               <span className="font-bold flex-shrink-0">!</span>{error}
@@ -266,7 +274,6 @@ export default function MokushiKiller() {
             </div>
           )}
 
-          {/* ステップ3 */}
           <div className="border-t border-slate-100 pt-4 space-y-3">
             <div className="flex items-center gap-2">
               <StepCircle num={3} />
@@ -287,12 +294,11 @@ export default function MokushiKiller() {
               </button>
               <button
                 onClick={handleClear}
-                className="h-10 px-3 sm:px-4 text-sm text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                className="h-10 px-3 sm:px-4 text-sm text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 クリア
               </button>
 
-              {/* 統計 */}
               {stats && (
                 <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
                   {stats.ng === 0 ? (
@@ -318,7 +324,7 @@ export default function MokushiKiller() {
         {/* ── 結果ツールバー ── */}
         {results && (
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-xs text-slate-400">表示：</p>
+            <p className="text-xs text-slate-500 font-medium">表示：</p>
             <button
               onClick={() => setDiffOnly(false)}
               className={`h-8 px-3 text-xs rounded-lg border transition-colors ${
@@ -347,22 +353,19 @@ export default function MokushiKiller() {
         {/* ── 結果テーブル ── */}
         {results && (
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-
-            {/* 凡例 */}
             <div className="px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-4 flex-wrap">
-              <span className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5 text-xs text-slate-600">
                 <span className="text-emerald-500 font-bold">✓</span> 一致（問題なし）
               </span>
-              <span className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5 text-xs text-slate-600">
                 <span className="text-rose-500 font-bold">✗</span> 差分あり（要確認）
               </span>
-              <span className="text-xs text-slate-400 ml-auto hidden sm:inline">
+              <span className="text-xs text-slate-500 ml-auto hidden sm:inline">
                 行番号 · 比較元 · 比較先
               </span>
             </div>
 
-            {/* 列ヘッダー */}
-            <div className="grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)] px-4 sm:px-5 py-2 border-b border-slate-100 text-[11px] font-medium text-slate-400 uppercase tracking-wider gap-2 sm:gap-3">
+            <div className="grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)] px-4 sm:px-5 py-2 border-b border-slate-100 text-[11px] font-medium text-slate-500 uppercase tracking-wider gap-2 sm:gap-3">
               <div>行</div>
               <div>比較元</div>
               <div>比較先</div>
@@ -370,8 +373,8 @@ export default function MokushiKiller() {
 
             {displayed.length === 0 ? (
               <div className="py-10 text-center">
-                <p className="text-sm text-slate-400">差分は見つかりませんでした</p>
-                <p className="text-xs text-slate-300 mt-1">すべての行で一致しています</p>
+                <p className="text-sm text-slate-500">差分は見つかりませんでした</p>
+                <p className="text-xs text-slate-400 mt-1">すべての行で一致しています</p>
               </div>
             ) : (
               displayed.map((row) => (
@@ -383,16 +386,16 @@ export default function MokushiKiller() {
                 >
                   <div className="grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)] px-4 sm:px-5 py-3 gap-2 sm:gap-3 items-start">
                     <div className="flex items-center gap-1 pt-0.5">
-                      <span className={`text-sm font-bold ${row.ok ? "text-emerald-400" : "text-rose-400"}`}>
+                      <span className={`text-sm font-bold ${row.ok ? "text-emerald-500" : "text-rose-500"}`}>
                         {row.ok ? "✓" : "✗"}
                       </span>
-                      <span className="text-[11px] font-mono text-slate-400">{row.n}</span>
+                      <span className="text-[11px] font-mono text-slate-500">{row.n}</span>
                     </div>
                     <p className={`text-xs sm:text-sm font-mono leading-relaxed break-all ${row.ok ? "text-slate-700" : "text-rose-700"}`}>
-                      {row.l || <span className="text-slate-300 italic text-xs">空行</span>}
+                      {row.l || <span className="text-slate-400 italic text-xs">空行</span>}
                     </p>
                     <p className={`text-xs sm:text-sm font-mono leading-relaxed break-all ${row.ok ? "text-slate-700" : "text-rose-700"}`}>
-                      {row.r || <span className="text-slate-300 italic text-xs">空行</span>}
+                      {row.r || <span className="text-slate-400 italic text-xs">空行</span>}
                     </p>
                   </div>
 
@@ -407,23 +410,24 @@ export default function MokushiKiller() {
                             key={p}
                             className="inline-flex items-center gap-1 text-[11px] font-mono bg-white border border-rose-100 rounded-md px-1.5 py-0.5"
                           >
-                            <span className="text-slate-400">{p + 1}文字目</span>
+                            <span className="text-slate-500">{p + 1}文字目</span>
                             <span className="text-rose-500 font-semibold">「{row.nl[p] ?? "なし"}」</span>
-                            <span className="text-slate-300">→</span>
+                            <span className="text-slate-400">→</span>
                             <span className="text-emerald-600 font-semibold">「{row.nr[p] ?? "なし"}」</span>
                           </span>
                         ))}
                         {row.diffs.length > 8 && (
-                          <span className="text-[11px] text-slate-400 self-center">
+                          <span className="text-[11px] text-slate-500 self-center">
                             他 {row.diffs.length - 8} 箇所
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] font-mono text-slate-400 leading-relaxed">
+                      {/* 内部キーなしで表示 */}
+                      <p className="text-[11px] font-mono text-slate-500 leading-relaxed">
                         表記ゆれ除去後：
-                        <span className="text-sky-500 ml-1 bg-sky-50 px-1 rounded">{row.nl || "（空）"}</span>
-                        <span className="mx-1 text-slate-300">→</span>
-                        <span className="text-emerald-500 bg-emerald-50 px-1 rounded">{row.nr || "（空）"}</span>
+                        <span className="text-sky-600 ml-1 bg-sky-50 px-1 rounded">{row.nld || "（空）"}</span>
+                        <span className="mx-1 text-slate-400">→</span>
+                        <span className="text-emerald-600 bg-emerald-50 px-1 rounded">{row.nrd || "（空）"}</span>
                       </p>
                     </div>
                   )}
@@ -433,7 +437,8 @@ export default function MokushiKiller() {
           </div>
         )}
 
-        <p className="text-center text-xs text-slate-300 pb-4">
+        {/* フッター：text-slate-500 に変更して視認性アップ */}
+        <p className="text-center text-xs text-slate-500 pb-4">
           入力したデータは外部に送信されません · すべてブラウザ内で処理されます
         </p>
       </main>
