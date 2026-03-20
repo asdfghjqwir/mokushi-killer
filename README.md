@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# テキスト照合ツール
 
-## Getting Started
+2つのテキストを行ごとに比較し、差分を検出するブラウザ完結ツールです。
 
-First, run the development server:
+**デモ：** https://your-app.vercel.app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## なぜ作ったか
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+日本の事務作業では、台帳と申請書の照合・請求書と発注書の突き合わせなど、テキストを目視で比較する作業が日常的に発生します。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+この作業の問題は「表記ゆれ」です。同じ内容でも「株式会社」と「（株）」、「１丁目」と「1丁目」のように書き方が異なるだけで、人間は一致と判断できても、ツールは差分として検出してしまいます。
 
-## Learn More
+結果として、差分ではない行を1つ1つ目視で確認するという二度手間が発生します。この無駄を解消するために作りました。
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 既存ツールとの比較
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+difff・WinMerge・各種テキスト比較ツールはすでに存在します。ただしこれらは純粋な文字列比較であるため、日本語の事務作業では使いにくい場面があります。
 
-## Deploy on Vercel
+| 課題 | 既存ツール | このツール |
+|---|---|---|
+| 「株式会社」と「（株）」 | 差分あり（誤検出） | 一致とみなす |
+| 「１丁目」と「1丁目」 | 差分あり（誤検出） | 一致とみなす |
+| 「ヶ崎」と「ケ崎」 | 差分あり（誤検出） | 一致とみなす |
+| 全角・半角カンマの混在 | 差分あり（誤検出） | 一致とみなす |
+| データの外部送信 | ツールによりあり | 送信ゼロ |
+| インストール | 必要なものがある | 不要（ブラウザのみ） |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+既存ツールの「文字列を正確に比較する」という設計は正しいですが、日本の事務作業に限定すると「表記ゆれを無視して比較する」ほうが実用的です。この判断がこのツールのコアです。
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+また、社用PCへのソフトウェアインストールが制限されている企業環境でも、ブラウザだけで動作する点も既存ツールとの差別化になっています。
+
+---
+
+## インフラを持たない設計にした理由
+
+AWSなどのクラウドインフラは使っていません。意図的な設計判断です。
+
+事務作業のデータには住所・法人名・金額など、個人情報や機密情報が含まれる場合があります。データをサーバーに送信する設計にすると、セキュリティリスクと運用コストが同時に発生します。
+
+今回の照合ロジックはブラウザのJavaScriptだけで完結できるため、サーバーを持つ必要がそもそもありませんでした。インフラを持たないことで、データ送信ゼロ・運用コスト永久0円・セキュリティリスクなしを同時に実現しています。
+
+「使えるから使う」ではなく「必要ないから使わない」という判断です。
+
+---
+
+## 対象ユーザー
+
+- 台帳と申請書の住所・法人名を突き合わせる事務職の方
+- 請求書と発注書の内容確認をする経理担当者
+- システム移行時のデータ照合をするエンジニア
+
+PCへのソフトウェアインストールが制限されている企業環境でも、ブラウザだけで動作します。
+
+---
+
+## 機能
+
+**揺らぎ吸収ロジック**
+- 全角数字・英字 → 半角に自動変換して比較
+- 法人格の統一（「株式会社」「（株）」「㈱」「(株)」を同一視）
+- 住所表記の統一（「ヶ」「ケ」、「一丁目」「1丁目」を同一視）
+- 記号・スペースの正規化（全角・半角カンマ、ハイフン、余分なスペースを無視）
+
+**UI・UX**
+- 差分行をハイライト表示
+- 何文字目に差分があるか視覚的に表示
+- 差分のみ表示フィルター
+- CSV エクスポート（Excel対応・BOM付き）
+- スマホ・タブレット・PC 完全対応
+- 操作ステップを番号で明示
+- 使い方ガイド内蔵
+
+**セキュリティ・コスト**
+- 外部APIなし・ブラウザ完結
+- 入力データの外部送信ゼロ
+- 運用コスト永久0円
+
+---
+
+## 技術スタック
+
+Next.js / TypeScript / Tailwind CSS / Vercel
