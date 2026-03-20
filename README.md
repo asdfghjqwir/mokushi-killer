@@ -2,7 +2,7 @@
 
 2つのテキストを行ごとに比較し、差分を検出するブラウザ完結ツールです。
 
-**デモ：** https://your-app.vercel.app
+**デモ：** https://mokushi-killer.vercel.app/
 
 ---
 
